@@ -12,8 +12,11 @@
     "deploy": "sh deploy.sh"
   },
   "dependencies": {
+    "aframe": "^1.6.0",
+    "aframe-extras": "^7.5.1",
     "bootstrap": "^5.2.3",
     "bootstrap-icons": "^1.11.3",
+    "hammerjs": "^2.0.8",
     "pinia": "^2.1.7",
     "three": "^0.167.1",
     "vue": "^3.4.29",

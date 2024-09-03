@@ -1,22 +1,11 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
-//import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { CanvasUI } from '../libs/CanvasUI'
-import { ControllerGestures } from '../libs/ControllerGestures'
-//import { ARButton } from '../libs/ARButton'
-
-//import { LoadingBar } from '../../libs/LoadingBar.js'
 
 class App {
   constructor() {
     const container = document.createElement('div')
     document.body.appendChild(container)
-
-    this.clock = new THREE.Clock()
-
-    this.loadingBar = new THREE.LoadingManager()
-    this.loadingBar.visible = false
 
     this.assetsPath = 'img/models/fireplaces/'
 
@@ -25,53 +14,40 @@ class App {
 
     this.scene = new THREE.Scene()
 
-    const ambient = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 2)
-    ambient.position.set(0.5, 1, 0.25)
-    this.scene.add(ambient)
+    this.scene.add(new THREE.HemisphereLight(0x606060, 0x404040))
+
+    const light = new THREE.DirectionalLight(0xffffff)
+    light.position.set(1, 1, 1).normalize()
+    this.scene.add(light)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.renderer.outputEncoding = THREE.sRGBEncoding
     container.appendChild(this.renderer.domElement)
     this.setEnvironment()
 
-    /*this.controls = new OrbitControls(this.camera, this.renderer.domElement)
-    this.controls.enableDamping = true
-    this.controls.enablePan = false
-    this.controls.minDistance = 5
-    this.controls.maxDistance = 20
-    this.controls.minPolarAngle = 0.5
-    this.controls.maxPolarAngle = 1.5
-    this.controls.autoRotate = false
-    this.controls.target = new THREE.Vector3(0, 1, 0)
-    this.controls.update() */
-
     this.reticle = new THREE.Mesh(
-      new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial()
+      new THREE.RingGeometry(0.12, 0.2, 4).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 })
     )
 
     this.reticle.matrixAutoUpdate = false
     this.reticle.visible = false
     this.scene.add(this.reticle)
 
+    // Variáveis para controle de rotação
+    this.isRotating = false
+    this.previousControllerX = 0
+    this.rotationSpeed = 4.0 // Ajuste a sensibilidade da rotação
+
     this.setupXR()
 
     window.addEventListener('resize', this.resize.bind(this))
-  }
 
-  createUI() {
-    const config = {
-      panelSize: { width: 0.2, height: 0.05 },
-      height: 128,
-      info: { type: 'text' }
-    }
-    const content = {
-      info: 'Debug info'
-    }
-    const ui = new CanvasUI(content, config)
-    this.ui = ui
+    // Adicionando pointer events
+    this.renderer.domElement.addEventListener('pointerdown', this.onPointerDown.bind(this))
+    this.renderer.domElement.addEventListener('pointermove', this.onPointerMove.bind(this))
+    this.renderer.domElement.addEventListener('pointerup', this.onPointerUp.bind(this))
   }
 
   setupXR() {
@@ -90,22 +66,11 @@ class App {
 
     const self = this
 
-    /*function onSessionStart() {
-      self.ui.mesh.position.set(0, -0.2, -0.3)
-      self.camera.add(self.ui.mesh)
-    }
-
-    function onSessionEnd() {
-      self.camera.remove(self.ui.mesh)
-    }
-
-    const btn = new ARButton(this.renderer, onSessionStart, onSessionEnd) */
-
     this.hitTestSourceRequested = false
     this.hitTestSource = null
 
     function onSelect() {
-      if (self.chair === undefined) return
+      if (!self.chair) return
 
       if (self.reticle.visible) {
         self.chair.position.setFromMatrixPosition(self.reticle.matrix)
@@ -113,10 +78,59 @@ class App {
       }
     }
 
+    // Eventos do controlador para rotação
     this.controller = this.renderer.xr.getController(0)
     this.controller.addEventListener('select', onSelect)
-
+    this.controller.addEventListener('selectstart', this.onSelectStart.bind(this))
+    this.controller.addEventListener('selectend', this.onSelectEnd.bind(this))
     this.scene.add(this.controller)
+  }
+
+  onPointerDown(event) {
+    // Inicia a rotação
+    this.isRotating = true
+    this.previousControllerX = event.clientX
+  }
+
+  onPointerMove(event) {
+    if (this.isRotating && this.chair) {
+      const deltaX = event.clientX - this.previousControllerX
+
+      // Aplica a rotação ao objeto
+      this.chair.rotation.y += deltaX * this.rotationSpeed
+
+      // Atualiza a posição anterior
+      this.previousControllerX = event.clientX
+    }
+  }
+
+  onPointerUp() {
+    // Termina a rotação
+    this.isRotating = false
+  }
+
+  onSelectStart() {
+    // Inicia a rotação
+    this.isRotating = true
+    this.previousControllerX = this.controller.position.x
+  }
+
+  onSelectEnd() {
+    // Termina a rotação
+    this.isRotating = false
+  }
+
+  rotateObject() {
+    if (this.isRotating && this.chair) {
+      const currentControllerX = this.controller.position.x
+      const deltaX = currentControllerX - this.previousControllerX
+
+      // Aplica a rotação ao objeto
+      this.chair.rotation.y += deltaX * this.rotationSpeed
+
+      // Atualiza a posição anterior
+      this.previousControllerX = currentControllerX
+    }
   }
 
   resize() {
@@ -153,32 +167,14 @@ class App {
     const loader = new GLTFLoader().setPath(this.assetsPath)
     const self = this
 
-    this.loadingBar.visible = true
+    loader.load(`fireplace${id}.glb`, (gltf) => {
+      self.scene.add(gltf.scene)
+      self.chair = gltf.scene
 
-    // Load a glTF resource
-    loader.load(
-      // resource URL
-      `fireplace${id}.glb`,
-      // called when the resource is loaded
-      function (gltf) {
-        self.scene.add(gltf.scene)
-        self.chair = gltf.scene
+      self.chair.visible = false
 
-        self.chair.visible = false
-
-        self.loadingBar.visible = false
-
-        self.renderer.setAnimationLoop(self.render.bind(self))
-      },
-      // called while loading is progressing
-      function (xhr) {
-        self.loadingBar.onProgress = xhr.loaded / xhr.total
-      },
-      // called when loading has errors
-      function (error) {
-        console.log(error)
-      }
-    )
+      self.renderer.setAnimationLoop(self.render.bind(self))
+    })
   }
 
   initAR() {
@@ -193,16 +189,11 @@ class App {
       self.renderer.xr.setReferenceSpaceType('local')
       self.renderer.xr.setSession(session)
 
-      self.ui.mesh.position.set(0, -0.2, -0.3)
-      self.camera.add(self.ui.mesh)
-
       currentSession = session
     }
 
     function onSessionEnded() {
       currentSession.removeEventListener('end', onSessionEnded)
-
-      self.camera.remove(self.ui.mesh)
 
       currentSession = null
 
@@ -213,67 +204,6 @@ class App {
 
       self.renderer.setAnimationLoop(null)
     }
-
-    this.gestures = new ControllerGestures(this.renderer)
-
-    this.gestures.addEventListener('tap', (ev) => {
-      console.log('tap')
-      self.ui.updateElement('info', 'tap')
-
-      if (!self.chair.object.visible) {
-        self.chair.object.visible = true
-        self.chair.object.position.set(0, -0.3, -0.5).add(ev.position)
-        self.scene.add(self.chair.object)
-      }
-    })
-
-    this.gestures.addEventListener('swipe', (ev) => {
-      console.log(ev)
-      self.ui.updateElement('info', `swipe ${ev.direction}`)
-      if (self.chair.object.visible) {
-        self.chair.object.visible = false
-        self.scene.remove(self.chair.object)
-      }
-    })
-
-    this.gestures.addEventListener('pan', (ev) => {
-      console.log(ev)
-      if (ev.initialise !== undefined) {
-        self.startPosition = self.chair.object.position.clone()
-      } else {
-        const pos = self.startPosition.clone().add(ev.delta.multiplyScalar(3))
-        self.chair.object.position.copy(pos)
-        self.ui.updateElement(
-          'info',
-          `pan x:${ev.delta.x.toFixed(3)} y:${ev.delta.y.toFixed(3)} z:${ev.delta.z.toFixed(3)}`
-        )
-      }
-    })
-
-    this.gestures.addEventListener('pinch', (ev) => {
-      console.log(ev)
-      if (ev.initialise !== undefined) {
-        self.startScale = self.chair.object.scale.clone()
-      } else {
-        const scale = self.startScale.clone().multiplyScalar(ev.scale)
-        self.chair.object.scale.copy(scale)
-        self.ui.updateElement(
-          'info',
-          `pinch delta:${ev.delta.toFixed(3)} scale:${ev.scale.toFixed(2)}`
-        )
-      }
-    })
-
-    this.gestures.addEventListener('rotate', (ev) => {
-      console.log(ev)
-      if (ev.initialise !== undefined) {
-        self.startQuaternion = self.chair.object.quaternion.clone()
-      } else {
-        self.chair.object.quaternion.copy(self.startQuaternion)
-        self.chair.object.rotateY(ev.theta)
-        self.ui.updateElement('info', `rotate ${ev.theta.toFixed(3)}`)
-      }
-    })
 
     if (currentSession === null) {
       navigator.xr.requestSession('immersive-ar', sessionInit).then(onSessionStarted)
@@ -323,6 +253,9 @@ class App {
 
       if (this.hitTestSource) this.getHitTestResults(frame)
     }
+
+    // Aplicar a rotação do objeto durante o render
+    this.rotateObject()
 
     this.renderer.render(this.scene, this.camera)
   }
