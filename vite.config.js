@@ -12,7 +12,8 @@ export default defineConfig({
     vue({
       template: {
         compilerOptions: {
-          isCustomElement: (tag) => tag.startsWith('a-')
+          // treat all tags with a dash as custom elements
+          isCustomElement: (tag) => tag.includes('-')
         }
       }
     }),

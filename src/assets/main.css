@@ -1,5 +1,11 @@
 @import './base.css';
 
+#app {
+  max-width: 1280px;
+  margin: 0 auto;
+  font-weight: normal;
+}
+
 a,
 .green {
   text-decoration: none;
@@ -8,12 +14,27 @@ a,
   padding: 3px;
 }
 
-.ar-button {
-  display: none;
-  width: 40px;
-  height: 30px;
-  float: right;
-  right: 5px;
-  border-radius: 15%;
-  border-color: brown;
+.black {
+  text-decoration: none;
+  color: hsla(0, 0%, 7%, 1);
+  transition: 0.4s;
+  padding: 3px;
+}
+
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    display: flex;
+    place-items: center;
+  }
+
+  #app {
+    width: 100vw;
+    height: 100vh;
+  }
 }
